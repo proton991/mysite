@@ -2,7 +2,7 @@ package com.fudan.mysite.entity.RBAC;
 
 import javax.persistence.*;
 import java.io.Serializable;
-import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "sys_permission")
@@ -11,15 +11,14 @@ public class SysPermission implements Serializable {
 
     private String permission;
 
-
-    private List<SysRole> roleList;
+    private Set<SysRole> roleList;
 
     @ManyToMany(mappedBy = "permissions")
-    public List<SysRole> getRoleList() {
+    public Set<SysRole> getRoleList() {
         return roleList;
     }
 
-    public void setRoleList(List<SysRole> roleList) {
+    public void setRoleList(Set<SysRole> roleList) {
         this.roleList = roleList;
     }
 

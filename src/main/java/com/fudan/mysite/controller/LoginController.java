@@ -5,12 +5,15 @@ import com.fudan.mysite.base.result.Result;
 import com.fudan.mysite.base.result.ResultCode;
 import com.fudan.mysite.entity.RBAC.SysRole;
 import com.fudan.mysite.entity.RBAC.UserInfo;
+import com.fudan.mysite.entity.UserProfile;
 import com.fudan.mysite.service.loginService;
 import com.fudan.mysite.service.sysRoleService;
 import com.fudan.mysite.service.userInfoService;
+import com.fudan.mysite.service.userProfileService;
+import com.fudan.mysite.util.RedisUtil;
+import com.fudan.mysite.util.TokenGenerator;
 import com.fudan.mysite.vo.LoginInfo;
 import com.fudan.mysite.vo.UserVO;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.authc.IncorrectCredentialsException;
@@ -18,20 +21,20 @@ import org.apache.shiro.authc.UsernamePasswordToken;
 import org.apache.shiro.crypto.hash.SimpleHash;
 import org.apache.shiro.subject.Subject;
 import org.apache.shiro.util.ByteSource;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import com.alibaba.fastjson.JSONObject;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @RestController
 public class LoginController extends BaseController {
 
+    @Resource
+    private RedisUtil redisUtil;
+
+    @Resource
+    private TokenGenerator tokenGenerator;
     @Resource
     private userInfoService userInfoService;
 
@@ -41,6 +44,9 @@ public class LoginController extends BaseController {
     @Resource
     private sysRoleService sysRoleService;
 
+    @Resource
+    private userProfileService userProfileService;
+
     @RequestMapping(value = "/guest", method = RequestMethod.GET)
     public String viewAsGuest() {
         return "you are viewing as a guest, your privileges are limited!";
@@ -49,16 +55,27 @@ public class LoginController extends BaseController {
     @RequestMapping(value = "/shiroLogin", method = RequestMethod.POST, produces = "application/json; charset=UTF-8")
     public Result<Object> shiroLogin(@RequestBody UserVO userVO) {
         Subject subject = SecurityUtils.getSubject();
-        System.out.println(subject.isAuthenticated());
+//        System.out.println(subject.isAuthenticated());
+        if (redisUtil.get(userVO.getUsername()) != null) {
+            System.out.println("You have already logged in!");
+            return Result.failure(ResultCode.ALREADY_LOGGED_IN);
+        }
+
         UsernamePasswordToken token = new UsernamePasswordToken(userVO.getUsername(), userVO.getPassword());
         try {
             subject.login(token);
+            String redisToken = tokenGenerator.generate(userVO.getUsername());
+            redisUtil.set(userVO.getUsername(), redisToken);
+            redisUtil.set(redisToken, userVO.getUsername());
+//            System.out.println(token.toString());
             LoginInfo loginInfo = loginService.getLoginInfo(userVO.getUsername());
+            System.out.println("login success!");
             return Result.success(loginInfo);
         } catch (IncorrectCredentialsException e) {
             System.out.println(e.getMessage());
             return Result.failure(ResultCode.WRONG_PASSWORD);
         } catch (AuthenticationException e) {
+            System.out.println(e.getMessage());
             return Result.failure(ResultCode.USER_NOT_EXIST);
         } catch (Exception e) {
             e.printStackTrace();
@@ -66,13 +83,15 @@ public class LoginController extends BaseController {
         return Result.failure(ResultCode.LOGIN_FAILED);
     }
 
-    @RequestMapping(value = "/login")
+    @RequestMapping(value = "/login", method = RequestMethod.POST, produces = "application/json; charset=UTF-8")
     public Result<Object> login(@RequestBody UserVO userVO) {
         String username = userVO.getUsername();
         UserInfo userInfo = userInfoService.findUserByName(username);
         if (userInfo != null) {
-            if (userInfo.getPassword().equals(userVO.getPassword()))
+            if (userInfo.getPassword().equals(userVO.getPassword())) {
                 return Result.success();
+            }
+
             else return Result.failure(ResultCode.WRONG_PASSWORD);
         }
         return Result.failure(ResultCode.USER_NOT_EXIST);
@@ -86,7 +105,7 @@ public class LoginController extends BaseController {
         userInfo.setUsername(userVO.getUsername());
         String uuid = UUID.randomUUID().toString().replace("-", "");
         userInfo.setUid(uuid);
-        List<SysRole> roleList = new ArrayList<>();
+        Set<SysRole> roleList = new HashSet<>();
         roleList.add(sysRoleService.findSysRoleByRole("user"));
         userInfo.setRoleList(roleList);
         Byte state = 1;
@@ -94,15 +113,26 @@ public class LoginController extends BaseController {
         ByteSource salt = ByteSource.Util.bytes(userVO.getUsername());
         Object password = new SimpleHash("MD5", userVO.getPassword(), salt, 1);
         userInfo.setPassword(password.toString());
+        UserProfile userProfile = new UserProfile();
+        userInfo.setUserProfile(userProfile);
+        userProfileService.saveProfile(userProfile);
         userInfoService.saveUserInfo(userInfo);
         return Result.success(ResultCode.REGISTRY_SUCCEED);
     }
 
     @RequestMapping(value = "/logout")
-    public Result<Object> shiroLogout() {
+    public Result<Object> shiroLogout(@RequestParam("token")String token) {
         Subject subject = SecurityUtils.getSubject();
-        subject.logout();
-        return Result.success(ResultCode.LOGOUT_SUCCEED);
+        String username = subject.getPrincipal().toString();
+        String redisUsername = redisUtil.get(token);
+        if (redisUsername != null) {
+            redisUtil.delete(username);
+            redisUtil.delete(token);
+            subject.logout();
+            System.out.println("logout success");
+            return Result.success(ResultCode.LOGOUT_SUCCEED);
+        }
+        return Result.failure(ResultCode.LOGOUT_FAILED);
     }
     @RequestMapping(value = "/unauth")
     public Result<Object> unauth() {

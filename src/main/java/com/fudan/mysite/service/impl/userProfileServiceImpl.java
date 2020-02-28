@@ -20,4 +20,9 @@ public class userProfileServiceImpl implements userProfileService {
     public UserProfile findByUserInfo(UserInfo userInfo) {
         return userProfileDao.findByUserInfo(userInfo);
     }
+
+    @Override
+    public UserProfile findByUsername(String username) {
+        return userProfileDao.findByUsername(username);
+    }
 }

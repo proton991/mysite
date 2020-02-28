@@ -14,6 +14,7 @@ public enum ResultCode {
     WRONG_PASSWORD(500102, "Wrong password, please check your password"),
     ALREADY_LOGGED_IN(500107, "You have already logged in"),
     NOT_LOGIN(500100, "Not login, please log in"),
+    ARTICLE_NOT_EXIST(500110, "Article Not Exist"),
     POST_ARTICLE_SUCCEED(500109, "You have posted an article successfully!");
     private Integer code;
 

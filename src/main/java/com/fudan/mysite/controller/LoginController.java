@@ -1,5 +1,6 @@
 package com.fudan.mysite.controller;
 
+import com.fudan.mysite.base.controller.BaseApiController;
 import com.fudan.mysite.base.controller.BaseController;
 import com.fudan.mysite.base.result.Result;
 import com.fudan.mysite.base.result.ResultCode;
@@ -15,9 +16,6 @@ import com.fudan.mysite.util.TokenGenerator;
 import com.fudan.mysite.vo.LoginInfo;
 import com.fudan.mysite.vo.UserVO;
 import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.authc.AuthenticationException;
-import org.apache.shiro.authc.IncorrectCredentialsException;
-import org.apache.shiro.authc.UsernamePasswordToken;
 import org.apache.shiro.crypto.hash.SimpleHash;
 import org.apache.shiro.subject.Subject;
 import org.apache.shiro.util.ByteSource;
@@ -28,7 +26,7 @@ import javax.annotation.Resource;
 import java.util.*;
 
 @RestController
-public class LoginController extends BaseController {
+public class LoginController extends BaseApiController {
 
     @Resource
     private RedisUtil redisUtil;
@@ -47,57 +45,65 @@ public class LoginController extends BaseController {
     @Resource
     private userProfileService userProfileService;
 
-    @RequestMapping(value = "/guest", method = RequestMethod.GET)
+    @RequestMapping(value = "/guest")
     public String viewAsGuest() {
         return "you are viewing as a guest, your privileges are limited!";
     }
+//
+//    @RequestMapping(value = "/shiroLogin", produces = "application/json; charset=UTF-8")
+//    public Result<Object> shiroLogin(@RequestBody UserVO userVO) {
+//        System.out.println("Start to login in...");
+//        Subject subject = SecurityUtils.getSubject();
+////        System.out.println(subject.isAuthenticated());
+//        if (redisUtil.get(userVO.getUsername()) != null) {
+//            System.out.println("You have already logged in!");
+//            return Result.failure(ResultCode.ALREADY_LOGGED_IN);
+//        }
+//
+//        UsernamePasswordToken token = new UsernamePasswordToken(userVO.getUsername(), userVO.getPassword());
+//        try {
+//            subject.login(token);
+//            String redisToken = tokenGenerator.generate(userVO.getUsername());
+//            redisUtil.set(userVO.getUsername(), redisToken);
+//            redisUtil.set(redisToken, userVO.getUsername());
+////            System.out.println(token.toString());
+//            LoginInfo loginInfo = loginService.getLoginInfo(userVO.getUsername());
+//            System.out.println("redis keys have been set...");
+//            System.out.println("login success!");
+//            return Result.success(loginInfo);
+//        } catch (IncorrectCredentialsException e) {
+//            System.out.println(e.getMessage());
+//            return Result.failure(ResultCode.WRONG_PASSWORD);
+//        } catch (AuthenticationException e) {
+//            System.out.println(e.getMessage());
+//            return Result.failure(ResultCode.USER_NOT_EXIST);
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//        return Result.failure(ResultCode.LOGIN_FAILED);
+//    }
 
-    @RequestMapping(value = "/shiroLogin", method = RequestMethod.POST, produces = "application/json; charset=UTF-8")
-    public Result<Object> shiroLogin(@RequestBody UserVO userVO) {
-        Subject subject = SecurityUtils.getSubject();
-//        System.out.println(subject.isAuthenticated());
-        if (redisUtil.get(userVO.getUsername()) != null) {
-            System.out.println("You have already logged in!");
-            return Result.failure(ResultCode.ALREADY_LOGGED_IN);
-        }
-
-        UsernamePasswordToken token = new UsernamePasswordToken(userVO.getUsername(), userVO.getPassword());
-        try {
-            subject.login(token);
-            String redisToken = tokenGenerator.generate(userVO.getUsername());
-            redisUtil.set(userVO.getUsername(), redisToken);
-            redisUtil.set(redisToken, userVO.getUsername());
-//            System.out.println(token.toString());
-            LoginInfo loginInfo = loginService.getLoginInfo(userVO.getUsername());
-            System.out.println("login success!");
-            return Result.success(loginInfo);
-        } catch (IncorrectCredentialsException e) {
-            System.out.println(e.getMessage());
-            return Result.failure(ResultCode.WRONG_PASSWORD);
-        } catch (AuthenticationException e) {
-            System.out.println(e.getMessage());
-            return Result.failure(ResultCode.USER_NOT_EXIST);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return Result.failure(ResultCode.LOGIN_FAILED);
-    }
-
-    @RequestMapping(value = "/login", method = RequestMethod.POST, produces = "application/json; charset=UTF-8")
+    @RequestMapping(value = "/login", method = RequestMethod.POST, consumes = "application/json")
     public Result<Object> login(@RequestBody UserVO userVO) {
         String username = userVO.getUsername();
         UserInfo userInfo = userInfoService.findUserByName(username);
         if (userInfo != null) {
-            if (userInfo.getPassword().equals(userVO.getPassword())) {
-                return Result.success();
+            ByteSource salt = ByteSource.Util.bytes(userVO.getUsername());
+            Object password = new SimpleHash("MD5", userVO.getPassword(), salt, 1);
+            if (userInfo.getPassword().equals(password.toString())) {
+                String redisToken = tokenGenerator.generate(userVO.getUsername());
+                redisUtil.set(userVO.getUsername(), redisToken);
+                redisUtil.set(redisToken, userVO.getUsername());
+                LoginInfo loginInfo = loginService.getLoginInfo(userVO.getUsername());
+                System.out.println("login success!");
+            return Result.success(loginInfo);
             }
-
             else return Result.failure(ResultCode.WRONG_PASSWORD);
         }
         return Result.failure(ResultCode.USER_NOT_EXIST);
     }
 
-    @RequestMapping(value = "/registry", method = RequestMethod.POST, produces = "application/json; charset=UTF-8")
+    @RequestMapping(value = "/registry", produces = "application/json; charset=UTF-8")
     public Result<Object> registry(@RequestBody UserVO userVO) {
         if (userInfoService.findUserByName(userVO.getUsername()) != null)
             return Result.failure(ResultCode.USER_EXIST);
@@ -114,6 +120,7 @@ public class LoginController extends BaseController {
         Object password = new SimpleHash("MD5", userVO.getPassword(), salt, 1);
         userInfo.setPassword(password.toString());
         UserProfile userProfile = new UserProfile();
+        userProfile.setUsername(userVO.getUsername());
         userInfo.setUserProfile(userProfile);
         userProfileService.saveProfile(userProfile);
         userInfoService.saveUserInfo(userInfo);
@@ -121,19 +128,19 @@ public class LoginController extends BaseController {
     }
 
     @RequestMapping(value = "/logout")
-    public Result<Object> shiroLogout(@RequestParam("token")String token) {
-        Subject subject = SecurityUtils.getSubject();
-        String username = subject.getPrincipal().toString();
+    public Result<Object> logout(@RequestParam("token")String token) {
+//        Subject subject = SecurityUtils.getSubject();
+//        String username = subject.getPrincipal().toString();
         String redisUsername = redisUtil.get(token);
         if (redisUsername != null) {
-            redisUtil.delete(username);
+            redisUtil.delete(redisUsername);
             redisUtil.delete(token);
-            subject.logout();
             System.out.println("logout success");
             return Result.success(ResultCode.LOGOUT_SUCCEED);
         }
         return Result.failure(ResultCode.LOGOUT_FAILED);
     }
+
     @RequestMapping(value = "/unauth")
     public Result<Object> unauth() {
 

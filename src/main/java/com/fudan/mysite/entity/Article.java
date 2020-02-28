@@ -1,18 +1,13 @@
 package com.fudan.mysite.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
 import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedBy;
-import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import javax.persistence.*;
 import java.io.Serializable;
 import java.util.Set;
 
-@JsonIgnoreProperties(value = {"authors"})
+//@JsonIgnoreProperties(value = {"authors"})
 @Entity
 @Table(name = "article")
 @EntityListeners(AuditingEntityListener.class)
@@ -29,14 +24,18 @@ public class Article implements Serializable {
 
     @Column(name = "state")
     private String state;
+
+    @Column(name = "views")
+    private Integer views;
+
     @Lob
     @Basic(fetch = FetchType.LAZY)
-    @Column(columnDefinition = "text", name = "body_md")
+    @Column(columnDefinition = "longtext", name = "body_md")
     private String bodyMd;
 
     @Lob
     @Basic(fetch = FetchType.LAZY)
-    @Column(columnDefinition = "text", name = "body_html")
+    @Column(columnDefinition = "longtext", name = "body_html")
     private String bodyHtml;
 
     public Set<UserProfile> getAuthors() {
@@ -51,12 +50,23 @@ public class Article implements Serializable {
     @Column(name = "create_date", updatable = false, nullable = false)
     private Long createTime;
 
-    @LastModifiedDate
     @Column(name = "update_time", nullable = false)
     private Long updateTime;
 
     @ManyToMany(mappedBy = "articles", cascade = CascadeType.REMOVE)
-    public Set<UserProfile> authors;
+    private Set<UserProfile> authors;
+
+    @OneToOne(cascade = CascadeType.REMOVE)
+    @JoinColumn(name = "aex_id")
+    private ArticleExtra extra;
+
+    public ArticleExtra getExtra() {
+        return extra;
+    }
+
+    public void setExtra(ArticleExtra extra) {
+        this.extra = extra;
+    }
 
     public Integer getArticleId() {
         return articleId;
@@ -113,6 +123,14 @@ public class Article implements Serializable {
 
     public void setState(String state) {
         this.state = state;
+    }
+
+    public Integer getViews() {
+        return views;
+    }
+
+    public void setViews(Integer views) {
+        this.views = views;
     }
 
     @Override

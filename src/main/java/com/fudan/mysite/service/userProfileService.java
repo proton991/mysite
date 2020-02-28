@@ -7,4 +7,6 @@ public interface userProfileService {
     void saveProfile(UserProfile userProfile);
 
     UserProfile findByUserInfo(UserInfo userInfo);
+
+    UserProfile findByUsername(String username);
 }

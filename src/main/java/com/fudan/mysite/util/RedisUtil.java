@@ -38,6 +38,7 @@ public class RedisUtil {
      */
     public String get(String key) {
         Jedis jedis = null;
+
         String value;
         try {
             jedis = jedisPool.getResource();
@@ -83,4 +84,17 @@ public class RedisUtil {
         }
     }
 
+    public void expire(String key) {
+        Jedis jedis = null;
+        try {
+            jedis = jedisPool.getResource();
+            jedis.expire(key, 60 * 60 * 12);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        } finally {
+            assert jedis != null;
+            jedis.close();
+        }
+
+    }
 }

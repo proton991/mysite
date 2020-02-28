@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface UserProfileDao extends JpaRepository<UserProfile, Integer> {
 
     UserProfile findByUserInfo(UserInfo userInfo);
+
+    UserProfile findByUsername(String username);
 }

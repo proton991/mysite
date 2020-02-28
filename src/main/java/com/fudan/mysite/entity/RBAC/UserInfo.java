@@ -25,6 +25,7 @@ public class UserInfo implements Serializable {
         this.uid = userId;
     }
 
+
     @OneToOne(cascade = CascadeType.REMOVE)
     @JoinColumn(name = "profile_id")
     public UserProfile getUserProfile() {

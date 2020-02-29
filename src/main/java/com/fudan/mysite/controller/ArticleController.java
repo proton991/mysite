@@ -63,6 +63,7 @@ public class ArticleController extends BaseApiController{
         article.setViews(0);
         ArticleExtra extra = new ArticleExtra();
         extra.setViews(0);
+        extra.setCategory(categoryService.findCategoryByCategoryId(articleVO.getCategoryId()));
         articleExtraService.saveExtra(extra);
         article.setExtra(extra);
 
@@ -110,6 +111,10 @@ public class ArticleController extends BaseApiController{
             article.setBodyMd(articleVO.getBodyMd());
             article.setBodyHtml(articleVO.getBodyHtml());
             article.setUpdateTime(new Date().getTime());
+            ArticleExtra extra = article.getExtra();
+            extra.setCategory(categoryService.findCategoryByCategoryId(articleVO.getCategoryId()));
+            articleExtraService.saveExtra(extra);
+            article.setExtra(extra);
             articleService.saveArticle(article);
             System.out.println("Edition finished Successfully");
             return Result.success();
@@ -141,6 +146,22 @@ public class ArticleController extends BaseApiController{
         return Result.success(result);
     }
 
+    @RequestMapping(value = "/articleCategory/edit")
+    public Result<Object> editArticleCategory(@RequestParam("id") Integer id, @RequestParam("category") String newName) {
+        Category category = categoryService.findCategoryByCategoryId(id);
+        category.setCategoryName(newName);
+        categoryService.saveCategory(category);
+        return Result.success();
+    }
+    @RequestMapping(value = "/articleCategory/delete")
+    public Result<Object> deleteArticleCategory(@RequestParam("id") Integer id) {
+        Category category = categoryService.findCategoryByCategoryId(id);
+        categoryService.saveCategory(category);
+        if (category.getArticleExtras().size() != 0)
+            return Result.failure(ResultCode.CATEGORY_NOT_NULL);
+        categoryService.deleteByCategoryId(id);
+        return Result.success();
+    }
     @RequestMapping(value = "/articleCategory/set")
     public Result<Object> setArticleCategory(@RequestParam("id") Integer id, @RequestParam("category") String name) {
         Article article = articleService.findArticleByArticleId(id);
@@ -184,6 +205,10 @@ public class ArticleController extends BaseApiController{
             }
         };
         JSONObject res = new JSONObject();
+        if (page < 1)
+            page = 1;
+        if (size < 1)
+            size = 1;
         Page<Article> articlePage = articleService.findBookCriteria(queryCondition, PageRequest.of(page - 1, size));
         res.put("articles", articlePage.getContent());
         res.put("totalPages", articlePage.getTotalPages());

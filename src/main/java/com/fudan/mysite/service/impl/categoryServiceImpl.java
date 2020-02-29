@@ -33,4 +33,9 @@ public class categoryServiceImpl implements categoryService {
     public Category findCategoryByCategoryId(Integer id) {
         return categoryDao.findCategoryByCategoryId(id);
     }
+
+    @Override
+    public void deleteByCategoryId(Integer id) {
+        categoryDao.deleteById(id);
+    }
 }

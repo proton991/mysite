@@ -15,7 +15,7 @@ public enum ResultCode {
     ALREADY_LOGGED_IN(500107, "You have already logged in"),
     NOT_LOGIN(500100, "Not login, please log in"),
     ARTICLE_NOT_EXIST(500110, "Article Not Exist"),
-    POST_ARTICLE_SUCCEED(500109, "You have posted an article successfully!");
+    CATEGORY_NOT_NULL(500109, "Can't delete a category with articles belonging to it");
     private Integer code;
 
     private String message;

@@ -11,17 +11,17 @@ import com.fudan.mysite.entity.RBAC.UserInfo;
 import com.fudan.mysite.entity.UserProfile;
 import com.fudan.mysite.service.*;
 import com.fudan.mysite.util.RedisUtil;
+import com.fudan.mysite.vo.ArticleFilter;
 import com.fudan.mysite.vo.ArticleVO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
-import javax.persistence.criteria.CriteriaBuilder;
-import javax.persistence.criteria.CriteriaQuery;
-import javax.persistence.criteria.Predicate;
-import javax.persistence.criteria.Root;
+import javax.persistence.criteria.*;
 import java.util.*;
 
 @RestController
@@ -136,15 +136,15 @@ public class ArticleController extends BaseApiController{
         return Result.success();
     }
 
-    @RequestMapping(value = "/articleList")
-    public Result<Object> getArticlePages(@RequestParam("page") Integer page, @RequestParam("size") Integer size) {
-        Page<Article> articlePage = articleService.findArticleNoCriteria(page - 1, size);
-        JSONObject result = new JSONObject();
-        Map<String, Object> map = new HashMap<>();
-        result.put("articles", articlePage.getContent());
-        result.put("totalPages", articlePage.getTotalPages());
-        return Result.success(result);
-    }
+//    @RequestMapping(value = "/articleList")
+//    public Result<Object> getArticlePages(@RequestParam("page") Integer page, @RequestParam("size") Integer size) {
+//        Page<Article> articlePage = articleService.findArticleNoCriteria(page - 1, size);
+//        JSONObject result = new JSONObject();
+//        Map<String, Object> map = new HashMap<>();
+//        result.put("articles", articlePage.getContent());
+//        result.put("totalPages", articlePage.getTotalPages());
+//        return Result.success(result);
+//    }
 
     @RequestMapping(value = "/articleCategory/edit")
     public Result<Object> editArticleCategory(@RequestParam("id") Integer id, @RequestParam("category") String newName) {
@@ -188,11 +188,28 @@ public class ArticleController extends BaseApiController{
         return Result.success(categoryService.findAll());
     }
 
-    @RequestMapping(value = "/articleListByCtg")
+    @RequestMapping(value = "/articleListByCtg", consumes = "application/json")
     public Result<Object> filterArticlesByCategory(@RequestParam("categoryId") Integer id,
                                                    @RequestParam("page") Integer page,
-                                                   @RequestParam("size") Integer size)
+                                                   @RequestParam("size") Integer size,
+                                                   @Nullable @RequestParam("sort") String property)
     {
+        PageRequest pageRequest;
+        if (property != null && !property.equals("default")) {
+            pageRequest = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, property));
+        }
+        else {
+            pageRequest = PageRequest.of(page - 1, size);
+        }
+        //Articles of all categories
+        if (id == -1) {
+            Page<Article> articlePage = articleService.findArticleNoCriteria(pageRequest);
+//            Page<Article> articlePage = articleService.findArticleNoCriteria(page - 1, size);
+            JSONObject result = new JSONObject();
+            result.put("articles", articlePage.getContent());
+            result.put("totalPages", articlePage.getTotalPages());
+            return Result.success(result);
+        }
         Specification<Article> queryCondition = new Specification<Article>() {
             @Override
             public Predicate toPredicate(Root<Article> root, CriteriaQuery<?> criteriaQuery, CriteriaBuilder criteriaBuilder) {
@@ -209,11 +226,50 @@ public class ArticleController extends BaseApiController{
             page = 1;
         if (size < 1)
             size = 1;
-        Page<Article> articlePage = articleService.findBookCriteria(queryCondition, PageRequest.of(page - 1, size));
+
+        Page<Article> articlePage = articleService.findBookCriteria(queryCondition, pageRequest);
         res.put("articles", articlePage.getContent());
         res.put("totalPages", articlePage.getTotalPages());
         return Result.success(res);
 //
 //        return Result.success(articles);
+    }
+    @RequestMapping(value = "/filterArticles")
+    public Result<Object> filterArticlesByTitle(@RequestBody ArticleFilter filter,
+                                                @RequestParam("page") Integer page,
+                                                @RequestParam("size") Integer size)
+    {
+        JSONObject result = new JSONObject();
+        Page<Article> articlePage = null;
+        PageRequest pageRequest;
+        String property = filter.getSort();
+        Integer id = filter.getCategoryId();
+        String keyword = filter.getKeyword();
+        if (property != null && !property.equals("default")) {
+            pageRequest = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, property));
+        }
+        else {
+            pageRequest = PageRequest.of(page - 1, size);
+        }
+        Specification<Article> queryCondition = new Specification<Article>() {
+            @Override
+            public Predicate toPredicate(Root<Article> root, CriteriaQuery<?> criteriaQuery, CriteriaBuilder criteriaBuilder) {
+                List<Predicate> predicateList = new ArrayList<>();
+                if (keyword != null && !keyword.equals("")) {
+                    Path<Article> path = root.get("title");
+                    predicateList.add(criteriaBuilder.like(root.get("title"), "%" + keyword + "%"));
+                }
+                if (id != null && id != -1) {
+                    predicateList.add(criteriaBuilder.equal(root.get("extra").get("category").get("categoryId"), id));
+                }
+                return criteriaBuilder.and(predicateList.toArray(new Predicate[predicateList.size()]));
+            }
+        };
+        articlePage = articleService.findBookCriteria(queryCondition, pageRequest);
+
+        result.put("articles", articlePage.getContent());
+        result.put("totalPages", articlePage.getTotalPages());
+        return Result.success(result);
+
     }
 }

@@ -46,8 +46,18 @@ public class articleServiceImpl implements articleService {
     }
 
     @Override
+    public Page<Article> findArticleNoCriteria(PageRequest pageRequest) {
+        return articleDao.findAll(pageRequest);
+    }
+
+    @Override
     public Page<Article> findBookCriteria(Specification<Article> specification, Pageable pageable) {
         return articleDao.findAll(specification, pageable);
+    }
+
+    @Override
+    public List<Article> searchByTitle(String keyword) {
+        return articleDao.findArticlesByTitleContaining(keyword);
     }
 
 }

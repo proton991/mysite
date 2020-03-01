@@ -15,5 +15,5 @@ public interface ArticleDao extends JpaRepository<Article, Integer> {
     Page<Article> findAll(Specification<Article> specification, Pageable pageable);
 //    void deleteByArticleId(Integer id);
 
-//    List<Article> findArticlesByTitleContaining
+    List<Article> findArticlesByTitleContaining(String keyword);
 }
